@@ -1,0 +1,223 @@
+---
+- name: Common roles
+  hosts: all
+
+  pre_tasks:
+  - name: check apt last update
+    stat: path=/var/cache/apt
+    register: apt_cache_stat
+
+  - name: update apt if needed
+    apt: update_cache=yes
+    when: ansible_date_time.epoch|float - apt_cache_stat.stat.mtime > 60*60*12
+
+  tasks:
+  - name: Install packages apt-transport-https, curl, i3, rsync, tree, vim
+    apt:
+      state: latest
+      name: "{{ item }}"
+    with_items:
+    - apt-transport-https
+    - arandr
+    - clementine
+    - cmake
+    - compton
+    - conky
+    - curl
+    - feh
+    - ffmpeg
+    - filezilla
+    - fontconfig
+    - fontconfig-config
+    - fonts-font-awesome
+    - fonts-materialdesignicons-webfont
+    - git
+    - htop
+    - i3
+    - imagemagick
+    - imapfilter
+    - make
+    - mutt
+    - msmtp
+    - mpv
+    - net-tools
+    - notmuch
+    - ntp
+    - ntpdate
+    - offlineimap
+    - openssl
+    - orage
+    - parcellite
+    - pasystray
+    - pciutils
+    - pulseaudio-utils
+    - python-gtk2
+    - python-setuptools
+    - python-distutils-extra
+    - qpdfview
+    - ranger
+    - redshift
+    - rofi
+    - rsync
+    - rxvt-unicode-256color
+    - scrot
+    - tmux
+    - tree
+    - tzdata
+    - unclutter
+    - unzip
+    - urlview
+    - vim
+    - vlc
+    - x11-utils
+    - xbacklight
+    - xdiskusage
+    - whois
+
+  # Set locale
+  - locale_gen:
+      name: fr_FR.UTF-8
+      state: present
+
+  # Setup dotfiles
+
+  # Setup sudoers
+  - name: Configure sudoers for systemctl
+    lineinfile:
+      dest: /etc/sudoers
+      state: present
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+    with_items:
+      - { regexp: 'systemctl$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /bin/systemctl' }
+      - { regexp: 'reboot$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /sbin/reboot' }
+      - { regexp: 'shutdown$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /sbin/shutdown' }
+
+  # Setup xbacklight
+  - name: Add to /etc/X11/xorg.conf xbacklight
+    blockinfile:
+      dest: /etc/X11/xorg.conf
+      state: present
+      create: yes
+      block: |
+        Section "Device"
+        Identifier "card0"
+        Driver "intel"
+        Option "backlight" "/sys/devices/pci0000:00/0000:00:02.0/drm/card0/card0-eDP-1/intel_backlight/"
+        EndSection
+
+  # Polybar
+  - name: Check polybar is installed
+    command: type polybar 
+    register: polybar_installed
+    failed_when: false
+    changed_when: false
+  
+  - name: Install packages for polybar
+    apt:
+      state: latest
+      name: "{{ item }}"
+    with_items:
+    - libcairo2-dev
+    - libxcb-ewmh-dev
+    - libxcb-icccm4-dev
+    - libxcb-image0-dev
+    - libxcb-randr0-dev
+    - libxcb-util0-dev
+    - libxcb-xkb-dev
+    - libxcb-xrm-dev
+    - libasound2-dev
+    - libpulse-dev
+    - libiw-dev
+    - ttf-unifont
+    - pkg-config
+    - python-xcbgen
+    - xcb-proto
+    when: polybar_installed.rc == 1
+
+  - name: Clone siji repository
+    git:
+      repo: https://github.com/stark/siji.git
+      dest: $HOME/siji
+    when: polybar_installed.rc == 1
+    
+  - name: Install siji
+    shell: cd $HOME/siji && ./install.sh -d /usr/share/fonts
+    when: polybar_installed.rc == 1
+
+  - name: Clone polybar repository
+    git:
+      repo: https://github.com/jaagr/polybar.git
+      dest: $HOME/polybar
+    when: polybar_installed.rc == 1
+  
+  - name: Create polybar build folder 
+    file:
+      path: $HOME/polybar/build
+      state: directory
+    when: polybar_installed.rc == 1
+  
+  - name: cmake polybar 
+    shell: cd $HOME/polybar/build && cmake ..
+    when: polybar_installed.rc == 1
+
+  - name: make install polybar 
+    shell: cd $HOME/polybar/build && make install
+    when: polybar_installed.rc == 1
+
+  # Screenkey 
+  - name: Check screenkey is installed
+    command: type screenkey 
+    register: screenkey_installed
+    failed_when: false
+    changed_when: false
+
+  - name: Clone screenkey repository
+    git:
+      repo: https://github.com/wavexx/screenkey.git
+      dest: $HOME/screnkey
+    when: screenkey_installed.rc == 1
+
+  - name: Setup screenkey
+    shell: "cd $HOME/screnkey && ./setup.py install"
+    when: screenkey_installed.rc == 1
+ 
+  # Slack
+  - name: Check Slack is installed
+    command: dpkg-query -W slack-desktop
+    register: slack_installed
+    failed_when: false
+    changed_when: false
+
+  - name: Install Slack
+    apt:
+      deb: https://downloads.slack-edge.com/linux_releases/slack-desktop-3.0.5-amd64.deb
+      state: present
+    when: slack_installed.rc == 1
+  
+  # Spotify
+  - name: Check Spotify is installed
+    command: dpkg-query -W spotify-desktop
+    register: spotify_installed
+    failed_when: false
+    changed_when: false
+
+  - name: Install Spotify apt-key
+    apt_key:
+      keyserver: keyserver.ubuntu.com
+      id: 0DF731E45CE24F27EEEB1450EFDC8610341D9410
+      state: present
+    when: spotify_installed.rc == 1
+
+  - name: Install Spotify apt-repository
+    apt_repository:
+      repo: deb http://repository.spotify.com stable non-free
+      update-cache: yes
+      filename: spotify
+    when: spotify_installed.rc == 1
+
+  - name: Install Spotify client
+    apt:
+      name: spotify-client
+      state: present
+    when: spotify_installed.rc == 1
