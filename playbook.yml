@@ -80,31 +80,17 @@
       state: present
 
   # Setup dotfiles
+    ## ToDo
 
   # Setup sudoers
   - name: Configure sudoers for systemctl
     lineinfile:
-      dest: /etc/sudoers
+      dest: /etc/sudoers.d/choiz
       state: present
       regexp: "{{ item.regexp }}"
       line: "{{ item.line }}"
     with_items:
-      - { regexp: 'systemctl$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /bin/systemctl' }
-      - { regexp: 'reboot$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /sbin/reboot' }
-      - { regexp: 'shutdown$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /sbin/shutdown' }
-
-  # Setup xbacklight
-  - name: Add to /etc/X11/xorg.conf xbacklight
-    blockinfile:
-      dest: /etc/X11/xorg.conf
-      state: present
-      create: yes
-      block: |
-        Section "Device"
-        Identifier "card0"
-        Driver "intel"
-        Option "backlight" "/sys/devices/pci0000:00/0000:00:02.0/drm/card0/card0-eDP-1/intel_backlight/"
-        EndSection
+      - { regexp: 'shutdown$', line: 'choiz    ALL=(ALL:ALL) NOPASSWD: /bin/systemctl,/sbin/reboot,/sbin/shutdown' }
 
   # Polybar
   - name: Check polybar is installed
