@@ -86,6 +86,7 @@
   - name: Configure sudoers for systemctl
     lineinfile:
       dest: /etc/sudoers.d/choiz
+      create: yes
       state: present
       regexp: "{{ item.regexp }}"
       line: "{{ item.line }}"
